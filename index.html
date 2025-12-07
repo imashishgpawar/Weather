@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Climate Data Analysis – Mumbai vs Bengaluru (2021–2023)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Plotly for visualizations -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <!-- PapaParse for CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.15);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #1f2937;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1d283a 0, #020617 45%, #000 100%);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    header {
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin: 0 0 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    h1 span.badge {
+      font-size: 0.9rem;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      background: rgba(56,189,248,0.1);
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      margin-top: 1.25rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    select {
+      padding: 0.45rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #020617;
+      color: var(--text);
+      outline: none;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+
+    .card {
+      background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(15,23,42,0.92));
+      border-radius: 1rem;
+      border: 1px solid rgba(148,163,184,0.15);
+      padding: 1rem 1rem 1.1rem;
+      box-shadow: 0 20px 45px rgba(15,23,42,0.85);
+    }
+
+    .card h2 {
+      font-size: 1.05rem;
+      margin: 0 0 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .card h2 span.label {
+      font-size: 0.78rem;
+      padding: 0.1rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.3);
+      color: var(--muted);
+    }
+
+    .card small {
+      color: var(--muted);
+    }
+
+    #dataQuality {
+      font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      white-space: pre-wrap;
+      padding: 0.6rem 0.7rem;
+      border-radius: 0.75rem;
+      background: #020617;
+      color: var(--muted);
+      border: 1px dashed rgba(75,85,99,0.7);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      margin-top: 0.25rem;
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(31,41,55,0.8);
+      padding: 0.3rem 0.4rem;
+      text-align: right;
+    }
+
+    th {
+      text-align: right;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+    .plots-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .plot-card {
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.14), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(59,130,246,0.2), transparent 60%);
+      border-radius: 1rem;
+      padding: 0.75rem;
+      border: 1px solid rgba(148,163,184,0.25);
+    }
+
+    .plot-title {
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+    }
+
+    .plot-title span.main {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .plot-sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      opacity: 0.8;
+    }
+
+    .footer-note {
+      margin-top: 1.6rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .city-pill {
+      font-size: 0.8rem;
+      padding: 0.05rem 0.5rem;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    @media (max-width: 960px) {
+      .grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .plots-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>
+        Climate Data Analysis
+        <span class="badge">Mumbai · Bengaluru · 2021–2023</span>
+      </h1>
+      <p>
+        Daily Temperature, Humidity and Rainfall – summary statistics, variability, correlations and visualizations.
+      </p>
+      <div class="controls">
+        <div class="control-group">
+          <label for="citySelect">Select dataset:</label>
+          <select id="citySelect">
+            <option value="Combined">Combined (Mumbai + Bengaluru)</option>
+            <option value="Mumbai">Mumbai only</option>
+            <option value="Bengaluru">Bengaluru only</option>
+          </select>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <h2>
+          Data Quality &amp; Consistency
+          <span class="label" id="qualityLabel"></span>
+        </h2>
+        <small>Basic checks for missing values, negative values and suspicious ranges.</small>
+        <pre id="dataQuality">Loading data…</pre>
+      </article>
+
+      <article class="card">
+        <h2>
+          Summary Statistics
+          <span class="label">Mean · Median · Std Dev · IQR · MAD</span>
+        </h2>
+        <small>Computed for Temperature (°C), Humidity (%) and Rainfall (mm).</small>
+        <table id="summaryTable"></table>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top:1.5rem;">
+      <h2>
+        Visualizations
+        <span class="label">Box · Histogram/Density · Scatter · Violin · Correlation</span>
+      </h2>
+      <div class="plots-grid">
+        <div class="plot-card">
+          <div class="plot-title">
+            <span class="main">Box Plot</span>
+            <span class="plot-sub">Distribution &amp; outliers for each variable</span>
+          </div>
+          <div id="boxPlot"></div>
+        </div>
+
+        <div class="plot-card">
+          <div class="plot-title">
+            <span class="main">Histogram &amp; Density</span>
+            <span class="plot-sub">Temperature distribution (normalized density)</span>
+          </div>
+          <div id="histPlot"></div>
+        </div>
+
+        <div class="plot-card">
+          <div class="plot-title">
+            <span class="main">Scatter Plot</span>
+            <span class="plot-sub">Temperature vs Humidity</span>
+          </div>
+          <div id="scatterPlot"></div>
+        </div>
+
+        <div class="plot-card">
+          <div class="plot-title">
+            <span class="main">Violin Plot</span>
+            <span class="plot-sub">Shape of distributions (all variables)</span>
+          </div>
+          <div id="violinPlot"></div>
+        </div>
+
+        <div class="plot-card" style="grid-column:1 / -1;">
+          <div class="plot-title">
+            <span class="main">Correlation Matrix</span>
+            <span class="plot-sub">Pearson correlation between variables</span>
+          </div>
+          <div id="corrHeatmap"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      <strong>Note:</strong> This page is designed to be opened with a simple local server (for example, the
+      “Live Server” extension in VS Code) so that the CSV files can be loaded via <code>fetch()</code>.
+    </div>
+  </div>
+
+  <script>
+    // ====== CONFIG ======
+    // Make sure these paths match your actual filenames.
+    const CSV_FILES = {
+      "Mumbai": "mumbai_climate_2021_2023.csv",
+      "Bengaluru": "bengaluru_weather_2021_2023.csv"
+    };
+
+    const NUM_COLS = ["Temperature", "Humidity", "Rainfall"];
+
+    const citySelect = document.getElementById("citySelect");
+    const qualityLabel = document.getElementById("qualityLabel");
+    const dataQualityEl = document.getElementById("dataQuality");
+    const summaryTable = document.getElementById("summaryTable");
+
+    let datasets = {}; // { Mumbai: [...], Bengaluru: [...], Combined: [...] }
+
+    // ====== UTILS (math) ======
+    function numericArray(data, key) {
+      return data
+        .map(row => Number(row[key]))
+        .filter(v => Number.isFinite(v));
+    }
+
+    function mean(arr) {
+      if (!arr.length) return NaN;
+      return arr.reduce((s, v) => s + v, 0) / arr.length;
+    }
+
+    function median(arr) {
+      if (!arr.length) return NaN;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+      }
+      return sorted[mid];
+    }
+
+    function quantile(arr, q) {
+      if (!arr.length) return NaN;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const pos = (sorted.length - 1) * q;
+      const base = Math.floor(pos);
+      const rest = pos - base;
+      if (sorted[base + 1] !== undefined) {
+        return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+      } else {
+        return sorted[base];
+      }
+    }
+
+    function stdDev(arr) {
+      if (arr.length < 2) return NaN;
+      const m = mean(arr);
+      const variance = arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function madMean(arr) {
+      const m = mean(arr);
+      const deviations = arr.map(v => Math.abs(v - m));
+      return mean(deviations);
+    }
+
+    function madMedian(arr) {
+      const med = median(arr);
+      const deviations = arr.map(v => Math.abs(v - med));
+      return median(deviations);
+    }
+
+    function pearsonCorrelation(x, y) {
+      const n = Math.min(x.length, y.length);
+      if (n < 2) return NaN;
+      const xSlice = x.slice(0, n);
+      const ySlice = y.slice(0, n);
+      const mx = mean(xSlice);
+      const my = mean(ySlice);
+
+      let num = 0;
+      let sx = 0;
+      let sy = 0;
+      for (let i = 0; i < n; i++) {
+        const dx = xSlice[i] - mx;
+        const dy = ySlice[i] - my;
+        num += dx * dy;
+        sx += dx * dx;
+        sy += dy * dy;
+      }
+      if (sx === 0 || sy === 0) return NaN;
+      return num / Math.sqrt(sx * sy);
+    }
+
+    function correlationMatrix(data) {
+      const result = {};
+      NUM_COLS.forEach(c1 => {
+        result[c1] = {};
+        const x = numericArray(data, c1);
+        NUM_COLS.forEach(c2 => {
+          if (c1 === c2) {
+            result[c1][c2] = 1;
+          } else {
+            const y = numericArray(data, c2);
+            result[c1][c2] = pearsonCorrelation(x, y);
+          }
+        });
+      });
+      return result;
+    }
+
+    function format(num) {
+      return Number.isFinite(num) ? num.toFixed(2) : "–";
+    }
+
+    // ====== DATA LOADING ======
+    function loadCSV(path, cityName) {
+      return fetch(path)
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to load " + path);
+          return res.text();
+        })
+        .then(text => {
+          const parsed = Papa.parse(text, {
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true
+          });
+          const rows = parsed.data
+            .filter(row => row.Date && row.Date !== "")
+            .map(row => ({
+              Date: row.Date,
+              Temperature: Number(row.Temperature),
+              Humidity: Number(row.Humidity),
+              Rainfall: Number(row.Rainfall),
+              City: cityName
+            }));
+          return rows;
+        });
+    }
+
+    function init() {
+      const promises = Object.entries(CSV_FILES).map(([city, file]) =>
+        loadCSV(file, city).then(rows => ({ city, rows }))
+      );
+
+      Promise.all(promises)
+        .then(results => {
+          results.forEach(({ city, rows }) => {
+            datasets[city] = rows;
+          });
+          // Combined dataset with City label
+          datasets["Combined"] = [...datasets["Mumbai"], ...datasets["Bengaluru"]];
+
+          // Initial view
+          updateDashboard(citySelect.value);
+
+          citySelect.addEventListener("change", () => {
+            updateDashboard(citySelect.value);
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          dataQualityEl.textContent =
+            "Error loading CSV files. Check filenames and run this file via a local server.\n\n" +
+            err.message;
+        });
+    }
+
+    // ====== DASHBOARD ======
+    function updateDashboard(cityKey) {
+      const data = datasets[cityKey] || [];
+      const label = cityKey === "Combined"
+        ? "Combined (Mumbai + Bengaluru)"
+        : cityKey;
+
+      qualityLabel.textContent = label;
+      updateDataQuality(data, label);
+      updateSummaryStats(data);
+      drawBoxPlot(data, label);
+      drawHistogram(data, label);
+      drawScatter(data, label);
+      drawViolin(data, label);
+      drawCorrelationHeatmap(data, label);
+    }
+
+    function updateDataQuality(data, label) {
+      if (!data.length) {
+        dataQualityEl.textContent = "No data loaded.";
+        return;
+      }
+
+      const total = data.length;
+      const missing = { Temperature: 0, Humidity: 0, Rainfall: 0 };
+      const negatives = { Temperature: 0, Humidity: 0, Rainfall: 0 };
+
+      data.forEach(row => {
+        NUM_COLS.forEach(col => {
+          const v = row[col];
+          if (!Number.isFinite(v)) {
+            missing[col]++;
+          } else if (v < 0) {
+            negatives[col]++;
+          }
+        });
+      });
+
+      const lines = [];
+      lines.push(`Dataset: ${label}`);
+      lines.push(`Total records (days): ${total}`);
+      lines.push("");
+      lines.push("Missing values per variable:");
+      NUM_COLS.forEach(col => {
+        lines.push(`  - ${col}: ${missing[col]}`);
+      });
+      lines.push("");
+      lines.push("Negative or impossible values per variable (should be 0):");
+      NUM_COLS.forEach(col => {
+        lines.push(`  - ${col}: ${negatives[col]}`);
+      });
+      lines.push("");
+      NUM_COLS.forEach(col => {
+        const arr = numericArray(data, col);
+        if (!arr.length) return;
+        const minVal = Math.min(...arr);
+        const maxVal = Math.max(...arr);
+        lines.push(`${col} range: [${format(minVal)} , ${format(maxVal)}]`);
+      });
+
+      lines.push("");
+      lines.push("Overall: No missing or negative values expected for a clean dataset.");
+      dataQualityEl.textContent = lines.join("\n");
+    }
+
+    function updateSummaryStats(data) {
+      if (!data.length) {
+        summaryTable.innerHTML = "<tr><td>No data</td></tr>";
+        return;
+      }
+
+      const statsByCol = {};
+      NUM_COLS.forEach(col => {
+        const arr = numericArray(data, col);
+        const q1 = quantile(arr, 0.25);
+        const q3 = quantile(arr, 0.75);
+        statsByCol[col] = {
+          mean: mean(arr),
+          median: median(arr),
+          std: stdDev(arr),
+          q1: q1,
+          q3: q3,
+          iqr: q3 - q1,
+          madMean: madMean(arr),
+          madMedian: madMedian(arr)
+        };
+      });
+
+      const metrics = [
+        { key: "mean", label: "Mean" },
+        { key: "median", label: "Median" },
+        { key: "std", label: "Std Dev" },
+        { key: "iqr", label: "IQR" },
+        { key: "madMean", label: "MAD (mean)" },
+        { key: "madMedian", label: "MAD (median)" }
+      ];
+
+      let html = "<thead><tr><th>Metric</th>";
+      NUM_COLS.forEach(col => {
+        html += `<th>${col}</th>`;
+      });
+      html += "</tr></thead><tbody>";
+
+      metrics.forEach(m => {
+        html += `<tr><td>${m.label}</td>`;
+        NUM_COLS.forEach(col => {
+          html += `<td>${format(statsByCol[col][m.key])}</td>`;
+        });
+        html += "</tr>";
+      });
+
+      html += "</tbody>";
+      summaryTable.innerHTML = html;
+    }
+
+    // ====== PLOTS ======
+    function drawBoxPlot(data, label) {
+      const traces = NUM_COLS.map(col => ({
+        y: numericArray(data, col),
+        name: col,
+        type: "box",
+        boxpoints: "outliers",
+        jitter: 0.3,
+        pointpos: -1.5
+      }));
+
+      const layout = {
+        margin: { t: 10, l: 40, r: 10, b: 40 },
+        yaxis: { title: "Value", zeroline: false },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(15,23,42,1)",
+        font: { size: 10, color: "#e5e7eb" },
+        showlegend: true
+      };
+
+      Plotly.newPlot("boxPlot", traces, layout, { responsive: true });
+    }
+
+    function drawHistogram(data, label) {
+      const temps = numericArray(data, "Temperature");
+      const trace = {
+        x: temps,
+        type: "histogram",
+        histnorm: "probability density",
+        nbinsx: 40,
+        opacity: 0.85
+      };
+
+      const layout = {
+        margin: { t: 10, l: 40, r: 10, b: 40 },
+        xaxis: { title: "Temperature (°C)" },
+        yaxis: { title: "Density" },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(15,23,42,1)",
+        font: { size: 10, color: "#e5e7eb" }
+      };
+
+      Plotly.newPlot("histPlot", [trace], layout, { responsive: true });
+    }
+
+    function drawScatter(data, label) {
+      const temps = numericArray(data, "Temperature");
+      const hums = numericArray(data, "Humidity");
+
+      const trace = {
+        x: temps,
+        y: hums,
+        mode: "markers",
+        type: "scatter",
+        marker: { size: 4, opacity: 0.6 }
+      };
+
+      const layout = {
+        margin: { t: 10, l: 40, r: 10, b: 40 },
+        xaxis: { title: "Temperature (°C)" },
+        yaxis: { title: "Humidity (%)" },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(15,23,42,1)",
+        font: { size: 10, color: "#e5e7eb" }
+      };
+
+      Plotly.newPlot("scatterPlot", [trace], layout, { responsive: true });
+    }
+
+    function drawViolin(data, label) {
+      const traces = NUM_COLS.map(col => ({
+        y: numericArray(data, col),
+        name: col,
+        type: "violin",
+        box: { visible: true },
+        meanline: { visible: true },
+        points: "all",
+        jitter: 0.25,
+        scalemode: "width"
+      }));
+
+      const layout = {
+        margin: { t: 10, l: 40, r: 10, b: 40 },
+        yaxis: { title: "Value", zeroline: false },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(15,23,42,1)",
+        font: { size: 10, color: "#e5e7eb" },
+        showlegend: true
+      };
+
+      Plotly.newPlot("violinPlot", traces, layout, { responsive: true });
+    }
+
+    function drawCorrelationHeatmap(data, label) {
+      const corr = correlationMatrix(data);
+      const z = [];
+      NUM_COLS.forEach(rowCol => {
+        const row = [];
+        NUM_COLS.forEach(colCol => {
+          row.push(corr[rowCol][colCol]);
+        });
+        z.push(row);
+      });
+
+      const trace = {
+        z: z,
+        x: NUM_COLS,
+        y: NUM_COLS,
+        type: "heatmap",
+        colorscale: "RdBu",
+        reversescale: true,
+        zmin: -1,
+        zmax: 1
+      };
+
+      const layout = {
+        margin: { t: 10, l: 60, r: 10, b: 40 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(15,23,42,1)",
+        font: { size: 10, color: "#e5e7eb" }
+      };
+
+      Plotly.newPlot("corrHeatmap", [trace], layout, { responsive: true });
+    }
+
+    // Start
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>
+
